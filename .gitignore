@@ -1,0 +1,11 @@
+.env
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+/tmp
+
+*.exe
+*.test
+*.prof
