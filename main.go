@@ -1,25 +1,15 @@
 package main
 
 import (
-	"context"
-
-	"github.com/fadhlimulyana20/go_backend/Config"
-	"github.com/gin-gonic/gin"
+	"github.com/fadhlimulyana20/go_backend/database"
+	"github.com/fadhlimulyana20/go_backend/routes"
 )
 
-var err error
-
 func main() {
-	r := gin.Default()
+	// Create db connection
+	database.Init()
 
-	db := Config.GetConnection()
-
-	ctx := context.Background()
-	if err := db.Ping(ctx); err != nil {
-		panic(err)
-	}
-
-	route(r)
-
-	r.Run()
+	// Initialize Routes
+	e := routes.Init()
+	e.Logger.Fatal(e.Start(":5000"))
 }
