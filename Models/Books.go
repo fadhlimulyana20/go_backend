@@ -1,7 +1,7 @@
-package Models
+package models
 
 type Book struct {
-	ID          int
+	ID          uint
 	Title       string
 	Description string
 }
