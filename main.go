@@ -11,7 +11,7 @@ func main() {
 	database.Init()
 	db := database.GetConnection()
 
-	db.AutoMigrate(&models.Book{})
+	db.AutoMigrate(&models.Book{}, &models.User{})
 
 	// Initialize Routes
 	e := routes.Init()
