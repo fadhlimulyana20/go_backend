@@ -2,11 +2,14 @@ package controller
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
+	"github.com/fadhlimulyana20/go_backend/config"
 	"github.com/fadhlimulyana20/go_backend/database"
 	"github.com/fadhlimulyana20/go_backend/models"
 	"github.com/fadhlimulyana20/go_backend/utils"
+	"github.com/google/uuid"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -54,7 +57,11 @@ func Register(c echo.Context) error {
 		return c.JSON(res.Status, res)
 	}
 
-	// confirmationCode := uuid.New().String()
+	confirmationCode := uuid.New().String()
+
+	if err := config.SendEmail(user.Email, "Password COnfirmation", confirmationCode); err != nil {
+		log.Fatal(err)
+	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"id":       user.ID,
@@ -103,6 +110,15 @@ func Login(c echo.Context) error {
 	}
 
 	// Return a user and create a session if everything is OK.
+	sess, _ := session.Get("session", c)
+	sess.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7,
+		HttpOnly: true,
+	}
+	sess.Values["userId"] = user.ID
+	sess.Save(c.Request(), c.Response())
+
 	res.Status = http.StatusOK
 	res.Message = "Success"
 	res.Data = map[string]interface{}{
