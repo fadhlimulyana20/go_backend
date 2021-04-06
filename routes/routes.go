@@ -29,6 +29,7 @@ func Init() *echo.Echo {
 	auth.GET("/me", controller.Me)
 	auth.POST("/register", controller.Register)
 	auth.POST("/login", controller.Login)
+	auth.GET("/confirm/:token", controller.ConfirmUser)
 
 	book := e.Group("/book")
 	book.GET("", controller.GetAllBooks)

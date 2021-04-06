@@ -8,7 +8,7 @@ type RedisConfig struct {
 	rdb *redis.Client
 }
 
-func (rc RedisConfig) Init() {
+func (rc *RedisConfig) Init() {
 	rc.rdb = redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // no password set
@@ -16,6 +16,6 @@ func (rc RedisConfig) Init() {
 	})
 }
 
-func (rc RedisConfig) GetConnection() *redis.Client {
+func (rc *RedisConfig) GetConnection() *redis.Client {
 	return rc.rdb
 }
