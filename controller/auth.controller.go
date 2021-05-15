@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -23,80 +24,82 @@ type loginDTO struct {
 }
 
 var ctx = context.Background()
+var db = database.GetConnection()
 
 func Register(c echo.Context) error {
 	// initialize variable
-	db := database.GetConnection()
-	var user models.User
+	user := &models.User{}
 	var res models.JsonResponse
 
 	// Binding input data
 	if err := c.Bind(&user); err != nil {
-		res.Status = http.StatusBadRequest
+		res.Status = constant.StatusError
 		res.Message = err.Error()
-		return c.JSON(res.Status, res)
+		return c.JSON(http.StatusInternalServerError, res)
 	}
 
 	// Validate Input data
 	if err := c.Validate(&user); err != nil {
-		res.Status = http.StatusBadRequest
+		res.Status = constant.StatusFail
 		res.Message = err.Error()
 		return c.JSON(http.StatusBadRequest, res)
 	}
 
 	// Create Hashed Password
-	hashedPassword, err := utils.HashPassword(user.Password)
+	err := user.BeforeSave(db)
 	// If there's an Error, return internal Server Error
 	if err != nil {
-		res.Status = http.StatusInternalServerError
+		res.Status = constant.StatusError
 		res.Message = err.Error()
-		return c.JSON(res.Status, res)
+		return c.JSON(http.StatusInternalServerError, res)
 	}
-	// Else, assign user password with hashed Password
-	user.Password = hashedPassword
 
 	// Create new user record
-	result := db.Create(&user)
-	if err := result.Error; err != nil {
-		res.Status = http.StatusInternalServerError
+	newUser, err := user.SaveUser(db)
+	if err != nil {
+		res.Status = constant.StatusError
 		res.Message = err.Error()
-		return c.JSON(res.Status, res)
+		return c.JSON(http.StatusInternalServerError, res)
 	}
 
 	// Create Confirmation url
 	cu := utils.ConfirmationUrl{}
-	code, err := cu.Create(user.ID)
+	code, err := cu.Create(newUser.ID)
 	if err != nil {
-		res.Status = http.StatusInternalServerError
+		res.Status = constant.StatusError
 		res.Message = err.Error()
-		return c.JSON(res.Status, res)
+		return c.JSON(http.StatusInternalServerError, res)
 	}
 
 	// sendEmail
-	if err := config.SendEmail(user.Email, "Password Confirmation", code); err != nil {
+	if err := config.SendEmail(newUser.Email, "Password Confirmation", code); err != nil {
 		log.Fatal(err)
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"id":       user.ID,
-		"email":    user.Email,
-		"firsName": user.FirstName,
-		"lastName": user.LastName,
-	})
+	res.Status = "success"
+	res.Data = map[string]interface{}{
+		"id":          newUser.ID,
+		"email":       newUser.Email,
+		"firstName":   newUser.FirstName,
+		"lastName":    newUser.LastName,
+		"isValidated": newUser.IsValidated,
+		"createdAt":   newUser.CreatedAt,
+		"updatedAt":   newUser.UpdatedAt,
+	}
+	return c.JSON(http.StatusOK, res)
 }
 
 func Login(c echo.Context) error {
 	// initialize Variable
-	db := database.GetConnection()
 	var user models.User
 	var login loginDTO
 	var res models.JsonResponse
 
 	// Binding data from user input, return error if there's an error
 	if err := c.Bind(&login); err != nil {
-		res.Status = http.StatusBadRequest
+		res.Status = constant.StatusError
 		res.Message = err.Error()
-		return c.JSON(res.Status, res)
+		return c.JSON(http.StatusInternalServerError, res)
 	}
 
 	// Else, find a user with email = input email
@@ -106,21 +109,22 @@ func Login(c echo.Context) error {
 	if err := result.Error; err != nil {
 		// Check error type
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			res.Status = http.StatusNotFound
-		} else {
-			res.Status = http.StatusInternalServerError
+			res.Status = constant.StatusFail
+			res.Message = err.Error()
+			return c.JSON(http.StatusNotFound, res)
 		}
 
+		res.Status = constant.StatusError
 		res.Message = err.Error()
-		return c.JSON(res.Status, res)
+		return c.JSON(http.StatusInternalServerError, res)
 	}
 
 	// If there's no error, compare input password with hashed password stored in database.
 	// return UnAuthorized, if not valid
 	if valid := utils.ComparePassword(login.Password, user.Password); !valid {
-		res.Status = http.StatusUnauthorized
+		res.Status = constant.StatusFail
 		res.Message = "Wrong Password"
-		return c.JSON(res.Status, res)
+		return c.JSON(http.StatusUnauthorized, res)
 	}
 
 	// Return a user and create a session if everything is OK.
@@ -133,31 +137,32 @@ func Login(c echo.Context) error {
 	sess.Values["userId"] = user.ID
 	sess.Save(c.Request(), c.Response())
 
-	res.Status = http.StatusOK
-	res.Message = "Success"
+	res.Status = constant.StatusSuccess
+	res.Message = fmt.Sprintf("Welcome %d", user.ID)
 	res.Data = map[string]interface{}{
 		"id":          user.ID,
 		"email":       user.Email,
 		"firsName":    user.FirstName,
 		"lastName":    user.LastName,
 		"isValidated": user.IsValidated,
+		"createdAt":   user.CreatedAt,
+		"updatedAt":   user.UpdatedAt,
 	}
-	return c.JSON(res.Status, res)
+	return c.JSON(http.StatusOK, res)
 
 }
 
 func ConfirmUser(c echo.Context) error {
 	// Initialize Varaible
-	db := database.GetConnection()
 	var res models.JsonResponse
 	var user models.User
 	token := c.Param("token")
 
 	// If there's no token provided, then return bad request
 	if token == "" {
-		res.Status = http.StatusBadRequest
+		res.Status = constant.StatusFail
 		res.Message = "Token Required!"
-		return c.JSON(res.Status, res)
+		return c.JSON(http.StatusBadRequest, res)
 	}
 
 	// Create Redis Connection
@@ -170,16 +175,16 @@ func ConfirmUser(c echo.Context) error {
 	key := constant.ConfirmUserPrefix + token
 	userId, err := rdb.Get(ctx, key).Result()
 	if err != nil {
-		res.Status = http.StatusBadRequest
+		res.Status = constant.StatusFail
 		res.Message = "Token Expired"
-		return c.JSON(res.Status, res)
+		return c.JSON(http.StatusBadRequest, res)
 	}
 
 	// Update user record to validated
 	db.Model(&user).Where("id", userId).Update("is_validated", true)
 
 	// return a message
-	res.Status = http.StatusOK
+	res.Status = constant.StatusSuccess
 	res.Message = "You are now validated"
 	return c.JSON(http.StatusOK, res)
 }

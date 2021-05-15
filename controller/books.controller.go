@@ -7,6 +7,7 @@ import (
 
 	"github.com/fadhlimulyana20/go_backend/database"
 	"github.com/fadhlimulyana20/go_backend/models"
+	"github.com/fadhlimulyana20/go_backend/utils/constant"
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
 )
@@ -20,13 +21,12 @@ func GetAllBooks(c echo.Context) error {
 	result := db.Find(&books)
 
 	if result.Error != nil {
-		res.Status = http.StatusInternalServerError
+		res.Status = constant.StatusFail
 		fmt.Println(result.Error.Error())
 		return c.JSON(http.StatusInternalServerError, res)
 	}
 
-	res.Status = http.StatusOK
-	res.Message = "Success"
+	res.Status = constant.StatusSuccess
 	res.Data = books
 
 	return c.JSON(http.StatusOK, res)
@@ -43,16 +43,16 @@ func GetBook(c echo.Context) error {
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			res.Status = http.StatusNotFound
+			res.Status = constant.StatusFail
 			res.Message = fmt.Sprintf("Book with id %s is not found", id)
 			return c.JSON(http.StatusNotFound, res)
 		}
-		res.Status = http.StatusInternalServerError
+		res.Status = constant.StatusError
+		res.Message = result.Error.Error()
 		return c.JSON(http.StatusInternalServerError, res)
 	}
 
-	res.Status = http.StatusOK
-	res.Message = "Success"
+	res.Status = constant.StatusSuccess
 	res.Data = book
 
 	return c.JSON(http.StatusOK, res)
@@ -65,14 +65,14 @@ func CreateBook(c echo.Context) error {
 
 	// Validate data binding,
 	if err := c.Bind(b); err != nil {
-		res.Status = http.StatusBadRequest
+		res.Status = constant.StatusError
 		res.Message = err.Error()
-		return c.JSON(http.StatusBadRequest, res)
+		return c.JSON(http.StatusInternalServerError, res)
 	}
 
 	// Validate Field, if field not valid then return error
 	if err := c.Validate(b); err != nil {
-		res.Status = http.StatusBadRequest
+		res.Status = constant.StatusFail
 		res.Message = err.Error()
 		return c.JSON(http.StatusBadRequest, res)
 	}
@@ -86,14 +86,13 @@ func CreateBook(c echo.Context) error {
 
 	// If there is any error when creating record in database, return error
 	if result.Error != nil {
-		res.Status = http.StatusInternalServerError
+		res.Status = constant.StatusError
 		res.Message = result.Error.Error()
 		return c.JSON(http.StatusInternalServerError, res)
 	}
 
 	// if everithing are ok, return data that has been created.
-	res.Status = http.StatusOK
-	res.Message = "Success"
+	res.Status = constant.StatusSuccess
 	res.Data = book
 
 	return c.JSON(http.StatusOK, res)
@@ -107,14 +106,14 @@ func ModifyBook(c echo.Context) error {
 
 	// Validate data binding,
 	if err := c.Bind(b); err != nil {
-		res.Status = http.StatusBadRequest
+		res.Status = constant.StatusError
 		res.Message = err.Error()
-		return c.JSON(http.StatusBadRequest, res)
+		return c.JSON(http.StatusInternalServerError, res)
 	}
 
 	// Validate Field, if field not valid then return error
 	if err := c.Validate(b); err != nil {
-		res.Status = http.StatusBadRequest
+		res.Status = constant.StatusFail
 		res.Message = err.Error()
 		return c.JSON(http.StatusBadRequest, res)
 	}
@@ -125,11 +124,12 @@ func ModifyBook(c echo.Context) error {
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			res.Status = http.StatusNotFound
+			res.Status = constant.StatusFail
 			res.Message = fmt.Sprintf("Book with id %s is not found", id)
 			return c.JSON(http.StatusNotFound, res)
 		}
-		res.Status = http.StatusInternalServerError
+		res.Status = constant.StatusError
+		res.Message = result.Error.Error()
 		return c.JSON(http.StatusInternalServerError, res)
 	}
 
@@ -138,8 +138,7 @@ func ModifyBook(c echo.Context) error {
 	db.Save(&book)
 
 	// if everithing are ok, return data that has been created.
-	res.Status = http.StatusOK
-	res.Message = "Success"
+	res.Status = constant.StatusSuccess
 	res.Data = book
 
 	return c.JSON(http.StatusOK, res)
@@ -155,17 +154,17 @@ func DeleteBook(c echo.Context) error {
 
 	if err := result.Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			res.Status = http.StatusNotFound
+			res.Status = constant.StatusFail
 			res.Message = err.Error()
 			return c.JSON(http.StatusNotFound, res)
 		}
 
-		res.Status = http.StatusInternalServerError
+		res.Status = constant.StatusError
 		res.Message = err.Error()
 		return c.JSON(http.StatusInternalServerError, res)
 	}
 
-	res.Status = http.StatusOK
+	res.Status = constant.StatusSuccess
 	res.Message = fmt.Sprintf("Book with id %s is successfully deleted", id)
 	return c.JSON(http.StatusOK, res)
 }
