@@ -24,15 +24,16 @@ type loginDTO struct {
 }
 
 var ctx = context.Background()
-var db = database.GetConnection()
 
 func Register(c echo.Context) error {
 	// initialize variable
-	user := &models.User{}
+	user := models.User{}
 	var res models.JsonResponse
+	db := database.GetConnection()
 
 	// Binding input data
 	if err := c.Bind(&user); err != nil {
+		fmt.Print(err)
 		res.Status = constant.StatusError
 		res.Message = err.Error()
 		return c.JSON(http.StatusInternalServerError, res)
@@ -91,6 +92,7 @@ func Register(c echo.Context) error {
 
 func Login(c echo.Context) error {
 	// initialize Variable
+	db := database.GetConnection()
 	var user models.User
 	var login loginDTO
 	var res models.JsonResponse
@@ -154,6 +156,7 @@ func Login(c echo.Context) error {
 
 func ConfirmUser(c echo.Context) error {
 	// Initialize Varaible
+	db := database.GetConnection()
 	var res models.JsonResponse
 	var user models.User
 	token := c.Param("token")
@@ -187,6 +190,44 @@ func ConfirmUser(c echo.Context) error {
 	res.Status = constant.StatusSuccess
 	res.Message = "You are now validated"
 	return c.JSON(http.StatusOK, res)
+}
+
+func ForgotPassword(c echo.Context) error {
+	db := database.GetConnection()
+	var res models.JsonResponse
+	user := &models.User{}
+
+	if err := c.Bind(&user); err != nil {
+		res.Status = constant.StatusError
+		res.Message = err.Error()
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+
+	_, err := user.FindUserByEmail(db, user.Email)
+	if err != nil {
+		res.Status = constant.StatusError
+		res.Message = err.Error()
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+
+	// Create Reset Password url
+	r := &utils.ResetPassword{}
+
+	if err := r.Init(user.ID); err != nil {
+		res.Status = constant.StatusError
+		res.Message = err.Error()
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+
+	// sendEmail
+	if err := config.SendEmail(user.Email, "Reset Password", r.Url); err != nil {
+		log.Fatal(err)
+	}
+
+	res.Status = constant.StatusSuccess
+	res.Message = "Reset Password Link has been sent."
+	return c.JSON(http.StatusOK, res)
+
 }
 
 func Auth(c echo.Context) error {

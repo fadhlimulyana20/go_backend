@@ -10,14 +10,14 @@ import (
 )
 
 type User struct {
-	ID          uint   `json:"id" gorm:"primaryKey"`
-	Email       string `json:"email" validate:"required,email"`
-	FirstName   string `json:"firstName" validate:"required"`
-	LastName    string `json:"lastName" validate:"required"`
-	Password    string `json:"password" validate:"required,min=8"`
-	IsValidated bool   `json:"isValidated" gorm:"default:0"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uint      `json:"id" gorm:"primaryKey"`
+	Email       string    `json:"email" validate:"required,email"`
+	FirstName   string    `json:"firstName" validate:"required"`
+	LastName    string    `json:"lastName" validate:"required"`
+	Password    string    `json:"password" validate:"required,min=8"`
+	IsValidated bool      `json:"isValidated" gorm:"default:0"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 func (u *User) BeforeSave(db *gorm.DB) error {
@@ -35,20 +35,34 @@ func (u *User) FindUserById(db *gorm.DB, uid uint) (*User, error) {
 	err := db.First(&u, uid).Error
 
 	if err != nil {
-		return &User{}, nil
+		return &User{}, err
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return &User{}, errors.New("User not found")
 	}
 
-	return u, err
+	return u, nil
+}
+
+func (u *User) FindUserByEmail(db *gorm.DB, email string) (*User, error) {
+	err := db.Where("email = ?", email).First(&u).Error
+
+	if err != nil {
+		return &User{}, err
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return &User{}, errors.New("User not found")
+	}
+
+	return u, nil
 }
 
 func (u *User) SaveUser(db *gorm.DB) (*User, error) {
 	// Create new user record
-	err := db.Create(&u).Error
-	if err != nil {
+	res := db.Create(&u)
+	if err := res.Error; err != nil {
 		return &User{}, err
 	}
 
